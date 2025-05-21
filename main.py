@@ -5,6 +5,9 @@ import shutil
 from PIL import Image
 import tkinter as tk
 from tkinter import ttk, filedialog
+import certifi
+import requests
+from urllib.parse import urlencode
 
 
 def has_transparency(img):
@@ -146,10 +149,55 @@ def main():
     print(f"不透明文件: {args.opaque}")
 
 
+class LoginWindow(tk.Tk):
+    def __init__(self):
+        super().__init__()
+        self.title("卡密验证")
+        self.geometry("300x200")
+        self._create_widgets()
+        self.mac = str(uuid.getnode())
+        self.version = "1.0"
+
+    def _create_widgets(self):
+        ttk.Label(self, text="卡密:").grid(row=0, column=0, padx=5, pady=5)
+        self.key_entry = ttk.Entry(self, width=25)
+        self.key_entry.grid(row=0, column=1, padx=5, pady=5)
+
+        self.auth_btn = ttk.Button(self, text="验证", command=self._do_auth)
+        self.auth_btn.grid(row=1, column=0, columnspan=2, pady=5)
+
+        self.status_label = ttk.Label(self, text="等待验证")
+        self.status_label.grid(row=2, column=0, columnspan=2)
+
+        self.check_time_btn = ttk.Button(self, text="查询到期时间", 
+                                      command=self._check_expire_time)
+        self.check_time_btn.grid(row=3, column=0, columnspan=2, pady=5)
+
+    def _do_auth(self):
+        key = self.key_entry.get()
+        if not key:
+            self.status_label.config(text="请输入卡密", foreground="red")
+            return
+
+        result = login(SingleCode=key, Ver=self.version, Mac=self.mac)
+        if len(result) == 32:
+            self.destroy()
+            ImageClassifierGUI().mainloop()
+        else:
+            self.status_label.config(text=f"验证失败: {result}", foreground="red")
+
+    def _check_expire_time(self):
+        key = self.key_entry.get()
+        if not key:
+            return
+        expire_time = get_expire_time(UserName=key)
+        self.status_label.config(text=f"到期时间: {expire_time}", foreground="blue")
+
 if __name__ == "__main__":
-    # 命令行参数存在时使用CLI模式，否则启动GUI
+    import uuid
+    from eydata import login, get_expire_time
+    
     if len([arg for arg in sys.argv if not arg.startswith('@')]) > 1:
         main()
     else:
-        app = ImageClassifierGUI()
-        app.mainloop()
+        LoginWindow().mainloop()
